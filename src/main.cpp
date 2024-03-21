@@ -88,22 +88,11 @@ class RenderInfo {
     void create_graphics_pipeline() {
         kat::GraphicsPipeline::Description desc{};
 
-        desc.shader_stages = {
-            {"shaders/main.vert.spv", vk::ShaderStageFlagBits::eVertex},
-            {"shaders/main.frag.spv", vk::ShaderStageFlagBits::eFragment},
-        };
+        desc.add_shader("shaders/main.vert.spv", vk::ShaderStageFlagBits::eVertex);
+        desc.add_shader("shaders/main.frag.spv", vk::ShaderStageFlagBits::eFragment);
 
         desc.blend_state.blend_attachments = {
-            vk::PipelineColorBlendAttachmentState{
-                true,
-                vk::BlendFactor::eSrcAlpha,
-                vk::BlendFactor::eOneMinusSrcAlpha,
-                vk::BlendOp::eAdd,
-                vk::BlendFactor::eOne,
-                vk::BlendFactor::eZero,
-                vk::BlendOp::eAdd,
-                kat::COLOR_COMPONENT_FLAGS_RGBA,
-            },
+            kat::STANDARD_BLEND_STATE,
         };
 
         desc.viewports.push_back(context->full_viewport());

@@ -112,6 +112,8 @@ namespace kat {
             std::shared_ptr<PipelineLayout> layout;
             std::shared_ptr<RenderPass>     render_pass;
             uint32_t                        subpass;
+
+            Description& add_shader(const ShaderId& id, vk::ShaderStageFlagBits stage, const std::string& entry_point = "main");
         };
 
         GraphicsPipeline(const std::shared_ptr<Context> &context, const Description &desc);

@@ -108,4 +108,9 @@ namespace kat {
     void GraphicsPipeline::bind(const vk::CommandBuffer &cmd) const {
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_pipeline);
     }
+
+    GraphicsPipeline::Description &GraphicsPipeline::Description::add_shader(const ShaderId &id, vk::ShaderStageFlagBits stage, const std::string &entry_point) {
+        shader_stages.emplace_back(id, stage, entry_point);
+        return *this;
+    }
 } // namespace kat

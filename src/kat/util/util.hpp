@@ -1,10 +1,10 @@
 #pragma once
 
-#include <optional>
 #include <array>
+#include <optional>
 
-#include <vulkan/vulkan.hpp>
 #include <glm/glm.hpp>
+#include <vulkan/vulkan.hpp>
 
 namespace kat {
     struct fatal_exc {};
@@ -63,7 +63,19 @@ namespace kat {
     constexpr color CYAN{0., 1., 1.};
     constexpr color MAGENTA{1., 0., 1.};
 
-    constexpr vk::ColorComponentFlags COLOR_COMPONENT_FLAGS_RGBA = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    constexpr vk::ColorComponentFlags COLOR_COMPONENT_FLAGS_RGBA =
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
     constexpr vk::ColorComponentFlags COLOR_COMPONENT_FLAGS_RGB = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB;
+
+    constexpr vk::PipelineColorBlendAttachmentState STANDARD_BLEND_STATE = vk::PipelineColorBlendAttachmentState{
+        true,
+        vk::BlendFactor::eSrcAlpha,
+        vk::BlendFactor::eOneMinusSrcAlpha,
+        vk::BlendOp::eAdd,
+        vk::BlendFactor::eOne,
+        vk::BlendFactor::eZero,
+        vk::BlendOp::eAdd,
+        kat::COLOR_COMPONENT_FLAGS_RGBA,
+    };
 
 } // namespace kat
