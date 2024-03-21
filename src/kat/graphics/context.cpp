@@ -142,6 +142,7 @@ namespace kat {
         vk::ImageUsageFlags iuf = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
 
         auto swc_ret = swb.set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
+                           .add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
                            .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
                            .set_old_swapchain(m_swc)
                            .set_image_usage_flags(static_cast<VkImageUsageFlags>(iuf))
@@ -161,12 +162,16 @@ namespace kat {
         m_swapchain = m_swc.swapchain;
 
         auto swci    = m_swc.get_images().value();
-        auto swci_tv = swci | std::views::transform([](const VkImage &image) -> vk::Image { return image; });
-        m_swc_images.assign_range(swci_tv);
+        m_swc_images.reserve(swci.size());
+        for (const auto& i : swci) {
+            m_swc_images.push_back(i);
+        }
 
         auto swciv    = m_swc.get_image_views().value();
-        auto swciv_tv = swciv | std::views::transform([](const VkImageView &image_view) -> vk::ImageView { return image_view; });
-        m_swc_image_views.assign_range(swciv_tv);
+        m_swc_image_views.reserve(swci.size());
+        for (const auto& iv : swciv) {
+            m_swc_image_views.push_back(iv);
+        }
     }
 
     FrameInfo Context::acquire_next_frame() {

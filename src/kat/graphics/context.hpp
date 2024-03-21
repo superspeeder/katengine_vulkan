@@ -156,46 +156,6 @@ namespace kat {
         template <QueueType Q>
         uint32_t get_queue_family() const;
 
-        template <>
-        vk::Queue get_queue<QueueType::GRAPHICS>() const {
-            return m_graphics_queue;
-        };
-
-        template <>
-        vk::Queue get_queue<QueueType::PRESENT>() const {
-            return m_present_queue;
-        };
-
-        template <>
-        vk::Queue get_queue<QueueType::TRANSFER>() const {
-            return m_transfer_queue;
-        };
-
-        template <>
-        vk::Queue get_queue<QueueType::COMPUTE>() const {
-            return m_compute_queue;
-        };
-
-        template <>
-        uint32_t get_queue_family<QueueType::GRAPHICS>() const {
-            return m_graphics_family;
-        };
-
-        template <>
-        uint32_t get_queue_family<QueueType::PRESENT>() const {
-            return m_present_family;
-        };
-
-        template <>
-        uint32_t get_queue_family<QueueType::TRANSFER>() const {
-            return m_transfer_family;
-        };
-
-        template <>
-        uint32_t get_queue_family<QueueType::COMPUTE>() const {
-            return m_compute_family;
-        };
-
         [[nodiscard]] vk::CommandPool create_command_pool_raw(uint32_t family, bool allow_individual_reset = true) const;
 
         template <QueueType Q>
@@ -251,5 +211,45 @@ namespace kat {
 
 
         std::unique_ptr<ShaderCache> m_shader_cache;
+    };
+
+    template <>
+    inline vk::Queue Context::get_queue<QueueType::GRAPHICS>() const {
+        return m_graphics_queue;
+    };
+
+    template <>
+    inline vk::Queue Context::get_queue<QueueType::PRESENT>() const {
+        return m_present_queue;
+    };
+
+    template <>
+    inline vk::Queue Context::get_queue<QueueType::TRANSFER>() const {
+        return m_transfer_queue;
+    };
+
+    template <>
+    inline vk::Queue Context::get_queue<QueueType::COMPUTE>() const {
+        return m_compute_queue;
+    };
+
+    template <>
+    inline uint32_t Context::get_queue_family<QueueType::GRAPHICS>() const {
+        return m_graphics_family;
+    };
+
+    template <>
+    inline uint32_t Context::get_queue_family<QueueType::PRESENT>() const {
+        return m_present_family;
+    };
+
+    template <>
+    inline uint32_t Context::get_queue_family<QueueType::TRANSFER>() const {
+        return m_transfer_family;
+    };
+
+    template <>
+    inline uint32_t Context::get_queue_family<QueueType::COMPUTE>() const {
+        return m_compute_family;
     };
 } // namespace kat
