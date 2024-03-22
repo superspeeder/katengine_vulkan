@@ -78,6 +78,19 @@
         "xtr1common": "cpp",
         "ranges": "cpp",
         "future": "cpp",
-        "hash_map": "cpp"
+        "hash_map": "cpp",
+        "*.tcc": "cpp",
+        "bitset": "cpp",
+        "cinttypes": "cpp",
+        "codecvt": "cpp",
+        "cwctype": "cpp",
+        "deque": "cpp",
+        "memory_resource": "cpp",
+        "numeric": "cpp",
+        "regex": "cpp",
+        "string_view": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp",
+        "shared_mutex": "cpp"
     }
 }

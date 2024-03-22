@@ -12,7 +12,7 @@ file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS src/*.c src/*.cpp src/*.h src/*
 
 add_executable(gaming2 ${GAME_SOURCES})
 target_include_directories(gaming2 PRIVATE src/)
-target_link_libraries(gaming2 glfw Vulkan::Vulkan glm::glm vk-bootstrap::vk-bootstrap)
+target_link_libraries(gaming2 glfw Vulkan::Vulkan glm::glm vk-bootstrap::vk-bootstrap GPUOpen::VulkanMemoryAllocator)
 
 
 find_package(Python REQUIRED)

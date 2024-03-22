@@ -16,6 +16,11 @@
 
 std::atomic_bool running = true;
 
+struct Vertex {
+    glm::vec3 position;
+    glm::vec4 color;
+};
+
 class RenderInfo {
   public:
     std::shared_ptr<kat::Context> context;
@@ -29,7 +34,7 @@ class RenderInfo {
     vk::CommandPool                                          command_pool;
     std::array<vk::CommandBuffer, kat::MAX_FRAMES_IN_FLIGHT> command_buffers;
 
-    vk::ShaderModule vert, frag;
+    std::shared_ptr<kat::Buffer> vertex_buffer;
 
     explicit RenderInfo(const std::shared_ptr<kat::Context> &context_) : context(context_) {
         command_pool    = context->create_command_pool_raw<kat::QueueType::GRAPHICS>();
@@ -39,15 +44,10 @@ class RenderInfo {
         create_framebuffers();
         create_pipeline_layout();
         create_graphics_pipeline();
-
-
-        vert = context->shader_cache()->get("shaders/main.vert.spv");
-        frag = context->shader_cache()->get("shaders/main.frag.spv");
+        create_vertex_buffer();
     };
 
-    ~RenderInfo(){
-
-    };
+    ~RenderInfo(){};
 
     void create_render_pass() {
         kat::RenderPass::Description desc{};
@@ -98,11 +98,29 @@ class RenderInfo {
         desc.viewports.push_back(context->full_viewport());
         desc.scissors.push_back(context->full_render_area());
 
+        desc.vertex_layout.bindings = {kat::VertexBinding{0,
+                                                          sizeof(float) * 7,
+                                                          {
+                                                              kat::VertexAttribute{0, vk::Format::eR32G32B32Sfloat, 0},
+                                                              kat::VertexAttribute{1, vk::Format::eR32G32B32A32Sfloat, 3 * sizeof(float)},
+                                                          },
+                                                          vk::VertexInputRate::eVertex}};
+
         desc.layout      = pipeline_layout;
         desc.render_pass = render_pass;
         desc.subpass     = 0;
 
         graphics_pipeline = std::make_shared<kat::GraphicsPipeline>(context, desc);
+    }
+
+    void create_vertex_buffer() {
+        const std::vector<Vertex> vertices = {
+            {glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)},
+            {glm::vec3(0.0f, -0.5f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)},
+            {glm::vec3(0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f)},
+        };
+
+        vertex_buffer = context->gpu_allocator()->init_buffer(vertices, vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_GPU_ONLY);
     }
 
     void render(const kat::FrameInfo &frame_info) {
@@ -111,15 +129,19 @@ class RenderInfo {
         cmd.reset();
         cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-        float v = 0.5 * (sin(glfwGetTime()) + 1);
+        const auto v = static_cast<float>((1 + sin(glfwGetTime())) * 0.5);
 
         kat::RenderPass::BeginInfo begin_info{};
         begin_info.render_area  = context->full_render_area();
-        begin_info.clear_values = { kat::color(v, v, v) };
+        begin_info.clear_values = {kat::color(v, v, v)};
         begin_info.framebuffer  = framebuffers[frame_info.image_index];
 
         render_pass->begin(cmd, begin_info);
         graphics_pipeline->bind(cmd);
+
+        const vk::Buffer         buf = vertex_buffer->handle();
+        constexpr vk::DeviceSize off = 0;
+        cmd.bindVertexBuffers(0, buf, off);
 
         cmd.draw(3, 1, 0, 0);
 
@@ -140,12 +162,12 @@ class RenderInfo {
 };
 
 void run() {
-    auto window = std::make_unique<kat::Window>(kat::WindowSettings{.size = {800, 600}, .pos = {GLFW_ANY_POSITION, GLFW_ANY_POSITION}, .title = "Window"});
+    const auto window = std::make_unique<kat::Window>(kat::WindowSettings{.size = {800, 600}, .pos = {GLFW_ANY_POSITION, GLFW_ANY_POSITION}, .title = "Window"});
 
     auto context = kat::Context::init(window, kat::ContextSettings{});
 
     auto render_thread = std::jthread([&]() {
-        std::unique_ptr<RenderInfo> render_info = std::make_unique<RenderInfo>(context);
+        const auto render_info = std::make_unique<RenderInfo>(context);
 
         while (running) {
             auto frame_info = context->acquire_next_frame();

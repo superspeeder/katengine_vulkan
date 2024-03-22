@@ -7,9 +7,9 @@
 #include <vulkan/vulkan.hpp>
 
 namespace kat {
-    struct fatal_exc {};
-
-    constexpr fatal_exc fatal{};
+    struct fatal_exc : std::exception {
+        [[nodiscard]] inline const char *what() const noexcept override { return "fatal error"; };
+    };
 
     template <typename T>
     const T *ptr_to_optional(const std::optional<T> &opt) {

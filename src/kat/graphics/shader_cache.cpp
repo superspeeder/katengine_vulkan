@@ -9,7 +9,7 @@ namespace kat {
 
         if (!f.good()) {
             std::cerr << "File not found: " << path << std::endl;
-            throw kat::fatal;
+            throw kat::fatal_exc{};
         }
 
         auto end = f.tellg();

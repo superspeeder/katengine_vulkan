@@ -8,6 +8,8 @@
 
 #include "kat/util/util.hpp"
 
+#include <vk_mem_alloc.h>
+
 namespace kat {
 
     enum class QueueType { GRAPHICS, PRESENT, TRANSFER, COMPUTE };
@@ -35,6 +37,8 @@ namespace kat {
     constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
     class ShaderCache;
+
+    class GpuAllocator;
 
     class Context : public std::enable_shared_from_this<Context> {
         explicit Context(const std::unique_ptr<Window> &window, const ContextSettings &settings = {});
@@ -104,17 +108,20 @@ namespace kat {
             return vk::Viewport(0.0f, 0.0f, static_cast<float>(m_swc.extent.width), static_cast<float>(m_swc.extent.height), 0.0f, 1.0f);
         };
 
+        [[nodiscard]] const std::unique_ptr<GpuAllocator> &gpu_allocator() const { return m_gpu_allocator; }
+
         void create_swapchain();
 
         [[nodiscard]] FrameInfo acquire_next_frame();
 
-        vk::Semaphore create_semaphore();
-        vk::Fence     create_fence(bool signaled);
-        vk::Fence     create_fence();
-        vk::Fence     create_fence_signaled();
+        vk::Semaphore create_semaphore() const;
+        vk::Fence     create_fence(bool signaled) const;
+        vk::Fence     create_fence() const;
+        vk::Fence     create_fence_signaled() const;
 
-        bool wait_for_fences(const std::vector<vk::Fence> &fences);
-        void reset_fences(const std::vector<vk::Fence> &fences);
+        bool wait_for_fences(const std::vector<vk::Fence> &fences) const;
+
+        void reset_fences(const std::vector<vk::Fence> &fences) const;
 
         template <uint32_t N>
         std::array<vk::Semaphore, N> create_semaphores() {
@@ -174,6 +181,10 @@ namespace kat {
 
         void present();
 
+        [[nodiscard]] vk::CommandBuffer begin_single_time_commands() const;
+
+        void end_single_time_commands(const vk::CommandBuffer &cmd) const;
+
       private:
         vkb::Instance       m_inst;
         vkb::PhysicalDevice m_phys;
@@ -209,8 +220,80 @@ namespace kat {
         std::array<vk::Semaphore, MAX_FRAMES_IN_FLIGHT> m_render_finished_semaphores;
         std::array<vk::Fence, MAX_FRAMES_IN_FLIGHT>     m_in_flight_fences;
 
+        std::unique_ptr<ShaderCache>  m_shader_cache;
+        std::unique_ptr<GpuAllocator> m_gpu_allocator;
 
-        std::unique_ptr<ShaderCache> m_shader_cache;
+        vk::CommandPool m_single_time_gt_pool;
+    };
+
+    class Buffer {
+      public:
+        Buffer(const std::shared_ptr<Context> &context, vk::Buffer buffer, VmaAllocation allocation, VmaAllocationInfo allocation_info);
+
+        ~Buffer();
+
+        void map_and_write(const void *data, const vk::DeviceSize &size, const vk::DeviceSize &offset) const;
+        void copy_from(const std::shared_ptr<Buffer> &other, const vk::DeviceSize &size, const vk::DeviceSize &src_offset, const vk::DeviceSize &dst_offset) const;
+
+        [[nodiscard]] inline vk::Buffer handle() const { return m_buffer; };
+
+      private:
+        vk::Buffer        m_buffer;
+        VmaAllocation     m_allocation;
+        VmaAllocationInfo m_allocation_info;
+
+        std::shared_ptr<Context> m_context;
+    };
+
+    class Image {
+      public:
+        Image(const std::shared_ptr<Context> &context, vk::Image image, VmaAllocation allocation, VmaAllocationInfo allocation_info);
+
+        ~Image();
+
+        [[nodiscard]] inline vk::Image handle() const { return m_image; };
+
+      private:
+        vk::Image         m_image;
+        VmaAllocation     m_allocation;
+        VmaAllocationInfo m_allocation_info;
+
+        std::shared_ptr<Context> m_context;
+    };
+
+    class GpuAllocator : public std::enable_shared_from_this<GpuAllocator> {
+      public:
+        explicit GpuAllocator(const std::shared_ptr<Context> &context);
+
+        ~GpuAllocator();
+
+        [[nodiscard]] std::shared_ptr<Buffer> create_buffer(const vk::BufferCreateInfo &create_info, const VmaMemoryUsage &vma_memory_usage = VMA_MEMORY_USAGE_AUTO) const;
+        [[nodiscard]] std::shared_ptr<Image>  create_image(const vk::ImageCreateInfo &create_info, const VmaMemoryUsage &vma_memory_usage = VMA_MEMORY_USAGE_AUTO) const;
+
+        [[nodiscard]] inline std::shared_ptr<Buffer> create_buffer(const vk::DeviceSize &size, const vk::BufferUsageFlags usage,
+                                                                   const VmaMemoryUsage &vma_memory_usage = VMA_MEMORY_USAGE_AUTO) const {
+            return create_buffer(vk::BufferCreateInfo({}, size, usage, vk::SharingMode::eExclusive, {}), vma_memory_usage);
+        };
+
+        void free_buffer(const vk::Buffer &buffer, const VmaAllocation &allocation) const;
+        void free_image(const vk::Image &imageimage, const VmaAllocation &allocation) const;
+
+        template <typename T>
+        [[nodiscard]] std::shared_ptr<Buffer> init_buffer(const std::vector<T> &data, const vk::BufferUsageFlags usage,
+                                                          const VmaMemoryUsage &vma_memory_usage = VMA_MEMORY_USAGE_AUTO) const {
+            return init_buffer(data.data(), data.size() * sizeof(T), usage, vma_memory_usage);
+        };
+
+        [[nodiscard]] std::shared_ptr<Buffer> init_buffer(const void *data, const vk::DeviceSize &size, const vk::BufferUsageFlags usage,
+                                                          const VmaMemoryUsage &vma_memory_usage = VMA_MEMORY_USAGE_AUTO) const;
+
+        [[nodiscard]] void *map(const VmaAllocation &alloc) const;
+
+        void unmap(const VmaAllocation &alloc) const;
+
+      private:
+        std::shared_ptr<Context> m_context;
+        VmaAllocator             m_allocator = VK_NULL_HANDLE;
     };
 
     template <>
