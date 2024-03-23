@@ -92,5 +92,6 @@
         "numbers": "cpp",
         "semaphore": "cpp",
         "shared_mutex": "cpp"
-    }
+    },
+    "glsllint.glslangValidatorArgs": "-V"
 }

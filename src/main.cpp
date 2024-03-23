@@ -11,6 +11,8 @@
 #include "kat/graphics/shader_cache.hpp"
 #include "kat/graphics/window.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <atomic>
 #include <thread>
 
@@ -19,6 +21,10 @@ std::atomic_bool running = true;
 struct Vertex {
     glm::vec3 position;
     glm::vec4 color;
+};
+
+struct VertexPushConstants {
+    glm::mat4 transform;
 };
 
 class RenderInfo {
@@ -34,7 +40,7 @@ class RenderInfo {
     vk::CommandPool                                          command_pool;
     std::array<vk::CommandBuffer, kat::MAX_FRAMES_IN_FLIGHT> command_buffers;
 
-    std::shared_ptr<kat::Buffer> vertex_buffer;
+    std::shared_ptr<kat::Buffer>              index_buffer;
     std::vector<std::shared_ptr<kat::Buffer>> vertex_buffers;
 
     explicit RenderInfo(const std::shared_ptr<kat::Context> &context_) : context(context_) {
@@ -48,7 +54,7 @@ class RenderInfo {
         create_vertex_buffer();
     };
 
-    ~RenderInfo(){};
+    ~RenderInfo() = default;
 
     void create_render_pass() {
         kat::RenderPass::Description desc{};
@@ -83,6 +89,9 @@ class RenderInfo {
 
     void create_pipeline_layout() {
         kat::PipelineLayout::Description desc{};
+
+        desc.push_constant_ranges = {vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(VertexPushConstants))};
+
         pipeline_layout = std::make_shared<kat::PipelineLayout>(context, desc);
     }
 
@@ -116,23 +125,65 @@ class RenderInfo {
 
     void create_vertex_buffer() {
         const std::vector<Vertex> vertices = {
-            {glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)},
-            {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)},
+            {glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)}, {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)},
             {glm::vec3(0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f)},
 
-            {glm::vec3(0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)},
-            {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)},
-            {glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f)},
+            {glm::vec3(0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)}, {glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f)},
         };
 
         vertex_buffers.reserve(kat::MAX_FRAMES_IN_FLIGHT);
-        for (size_t i = 0 ; i < kat::MAX_FRAMES_IN_FLIGHT ; i++) {
+        for (size_t i = 0; i < kat::MAX_FRAMES_IN_FLIGHT; i++) {
             vertex_buffers.push_back(context->gpu_allocator()->init_buffer(vertices, vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU));
         }
+
+        const std::vector<uint32_t> indices = {0, 1, 2, 4, 3, 1};
+
+        index_buffer = context->gpu_allocator()->init_buffer(indices, vk::BufferUsageFlagBits::eIndexBuffer, VMA_MEMORY_USAGE_GPU_ONLY);
     }
+
+    float y = 0.0f;
+    float c = 0.1f;
+
+    float this_frame = glfwGetTime();
+    float last_frame = this_frame - 0.01667;
+    float delta      = 0.01667;
 
     void render(const kat::FrameInfo &frame_info) {
         auto cmd = command_buffers[context->current_frame()];
+
+        if (y > 0.3333f && c > 0) {
+            c = -c;
+            y = 0.3333f;
+        };
+
+        if (y < -0.3333f && c < 0) {
+            c = -c;
+            y = -0.3333f;
+        };
+
+        y += c * delta;
+
+        const std::vector<Vertex> vertices = {
+            {glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)}, {glm::vec3(0.0f, y, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)},
+            {glm::vec3(0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f)},
+
+            {glm::vec3(0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)}, {glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f)},
+        };
+
+        const auto &buf = vertex_buffers[context->current_frame()];
+
+        constexpr float r = 0.5f;
+
+        float x = r * cos(this_frame);
+        float z = r * sin(this_frame);
+        float y = 0;
+
+        glm::mat4 mat = glm::translate(glm::identity<glm::mat4>(), {x, z, 0});
+
+        VertexPushConstants pc = {mat};
+
+        buf->map_and_write(vertices, 0);
+
 
         cmd.reset();
         cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
@@ -147,12 +198,14 @@ class RenderInfo {
         render_pass->begin(cmd, begin_info);
         graphics_pipeline->bind(cmd);
 
+        cmd.bindIndexBuffer(index_buffer->handle(), 0, vk::IndexType::eUint32);
 
-        const vk::Buffer         buf = vertex_buffers[context->current_frame()]->handle();
         constexpr vk::DeviceSize off = 0;
-        cmd.bindVertexBuffers(0, buf, off);
+        cmd.bindVertexBuffers(0, buf->handle(), off);
 
-        cmd.draw(6, 1, 0, 0);
+        cmd.pushConstants<VertexPushConstants>(pipeline_layout->handle(), vk::ShaderStageFlagBits::eVertex, 0, pc);
+
+        cmd.drawIndexed(6, 1, 0, 0, 0);
 
         render_pass->end(cmd);
 
@@ -167,6 +220,10 @@ class RenderInfo {
         si.setWaitDstStageMask(wait_stages);
 
         context->graphics_queue().submit(si, frame_info.in_flight_fence);
+
+        last_frame = this_frame;
+        this_frame = glfwGetTime();
+        delta      = this_frame - last_frame;
     }
 };
 
@@ -203,7 +260,8 @@ int main() {
     try {
         glfwInit();
         run();
-    } catch (kat::fatal_exc) {
+    } catch (const std::exception &e) {
+        std::cerr << "Fatally crashed: " << e.what() << std::endl;
         std::cerr << "Fatal error encountered. Exiting." << std::endl;
         ec = EXIT_FAILURE;
     }

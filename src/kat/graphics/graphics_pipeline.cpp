@@ -7,6 +7,7 @@ namespace kat {
 
     PipelineLayout::PipelineLayout(const std::shared_ptr<Context> &context, const Description &desc) : m_context(context) {
         vk::PipelineLayoutCreateInfo ci{};
+        ci.setPushConstantRanges(desc.push_constant_ranges);
 
         m_pipeline_layout = m_context->device().createPipelineLayout(ci);
     }

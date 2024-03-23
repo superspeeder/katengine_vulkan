@@ -36,7 +36,9 @@ namespace kat {
     class PipelineLayout {
       public:
         struct Description {
-            // todo
+            // todo descriptors
+
+            std::vector<vk::PushConstantRange> push_constant_ranges;
         };
 
         PipelineLayout(const std::shared_ptr<Context> &context, const Description &desc);
