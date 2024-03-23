@@ -35,6 +35,7 @@ class RenderInfo {
     std::array<vk::CommandBuffer, kat::MAX_FRAMES_IN_FLIGHT> command_buffers;
 
     std::shared_ptr<kat::Buffer> vertex_buffer;
+    std::vector<std::shared_ptr<kat::Buffer>> vertex_buffers;
 
     explicit RenderInfo(const std::shared_ptr<kat::Context> &context_) : context(context_) {
         command_pool    = context->create_command_pool_raw<kat::QueueType::GRAPHICS>();
@@ -116,11 +117,18 @@ class RenderInfo {
     void create_vertex_buffer() {
         const std::vector<Vertex> vertices = {
             {glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)},
-            {glm::vec3(0.0f, -0.5f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)},
+            {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)},
             {glm::vec3(0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f)},
+
+            {glm::vec3(0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)},
+            {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)},
+            {glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 1.0f, 1.0f)},
         };
 
-        vertex_buffer = context->gpu_allocator()->init_buffer(vertices, vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_GPU_ONLY);
+        vertex_buffers.reserve(kat::MAX_FRAMES_IN_FLIGHT);
+        for (size_t i = 0 ; i < kat::MAX_FRAMES_IN_FLIGHT ; i++) {
+            vertex_buffers.push_back(context->gpu_allocator()->init_buffer(vertices, vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU));
+        }
     }
 
     void render(const kat::FrameInfo &frame_info) {
@@ -139,11 +147,12 @@ class RenderInfo {
         render_pass->begin(cmd, begin_info);
         graphics_pipeline->bind(cmd);
 
-        const vk::Buffer         buf = vertex_buffer->handle();
+
+        const vk::Buffer         buf = vertex_buffers[context->current_frame()]->handle();
         constexpr vk::DeviceSize off = 0;
         cmd.bindVertexBuffers(0, buf, off);
 
-        cmd.draw(3, 1, 0, 0);
+        cmd.draw(6, 1, 0, 0);
 
         render_pass->end(cmd);
 
