@@ -15,7 +15,8 @@ namespace kat {
     struct WindowSettings {
         glm::ivec2  size{800, 600};
         glm::ivec2  pos{GLFW_ANY_POSITION, GLFW_ANY_POSITION};
-        std::string title = "Window";
+        std::string title      = "Window";
+        bool        fullscreen = false;
     };
 
     class Window {
@@ -25,14 +26,19 @@ namespace kat {
         ~Window();
 
         [[nodiscard]] bool is_open() const;
-        static void        poll();
 
-        [[nodiscard]] GLFWwindow *window() const { return m_window; }
+        static void poll();
 
+        [[nodiscard]] inline GLFWwindow *window() const { return m_window; }
 
-        vk::SurfaceKHR create_surface(const vk::Instance& instance) const;
+        [[nodiscard]] bool get_key(int key) const;
+
+        [[nodiscard]] vk::SurfaceKHR create_surface(const vk::Instance &instance) const;
+
+        [[nodiscard]] const glm::ivec2 &size() const { return m_size; };
 
       private:
         GLFWwindow *m_window;
+        glm::ivec2  m_size;
     };
 } // namespace kat

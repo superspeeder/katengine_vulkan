@@ -9,7 +9,20 @@ namespace kat {
         vk::PipelineLayoutCreateInfo ci{};
         ci.setPushConstantRanges(desc.push_constant_ranges);
 
+        std::vector<vk::DescriptorSetLayout> layouts;
+        layouts.reserve(desc.descriptor_set_layouts.size());
+        for (const auto &l : desc.descriptor_set_layouts) {
+            layouts.push_back(l->handle());
+        }
+
+        ci.setSetLayouts(layouts);
+
         m_pipeline_layout = m_context->device().createPipelineLayout(ci);
+    }
+
+    void PipelineLayout::bind_descriptor_sets(const vk::CommandBuffer &cmd, const vk::PipelineBindPoint &bind_point, uint32_t first_set,
+                                              const std::vector<vk::DescriptorSet> &sets, const std::vector<uint32_t> &dynamic_offsets) const {
+        cmd.bindDescriptorSets(bind_point, m_pipeline_layout, first_set, sets.size(), sets.data(), dynamic_offsets.size(), dynamic_offsets.data());
     }
 
     GraphicsPipeline::GraphicsPipeline(const std::shared_ptr<Context> &context, const Description &desc) : m_context(context) {
@@ -20,8 +33,6 @@ namespace kat {
         for (const auto &stage : desc.shader_stages) {
             shader_stages.push_back(vk::PipelineShaderStageCreateInfo({}, stage.stage, m_context->shader_cache()->get(stage.shader_id), stage.entry_point.c_str()));
         }
-
-        std::cout << shader_stages.size() << " stages\n";
 
         vk::PipelineVertexInputStateCreateInfo vertex_input{};
 
@@ -114,4 +125,46 @@ namespace kat {
         shader_stages.emplace_back(id, stage, entry_point);
         return *this;
     }
+
+    DescriptorSetLayout::DescriptorSetLayout(const std::shared_ptr<Context> &context, const Description &desc) : m_context(context) {
+        vk::DescriptorSetLayoutCreateInfo ci{};
+        ci.setBindings(desc.bindings);
+
+        m_descriptor_set_layout = m_context->device().createDescriptorSetLayout(ci);
+    }
+
+    DescriptorPool::DescriptorPool(const std::shared_ptr<Context> &context, const Description &desc) : m_context(context) {
+        vk::DescriptorPoolCreateInfo ci{};
+        ci.setPoolSizes(desc.pool_sizes);
+        ci.maxSets = desc.max_sets;
+
+        m_descriptor_pool = m_context->device().createDescriptorPool(ci);
+    }
+
+    std::vector<vk::DescriptorSet> DescriptorPool::allocate_sets(const std::vector<std::shared_ptr<kat::DescriptorSetLayout>> &layouts) const {
+        std::vector<vk::DescriptorSetLayout> layouts_{};
+        layouts_.reserve(layouts.size());
+
+        for (const auto &layout : layouts)
+            layouts_.push_back(layout->handle());
+
+        return allocate_sets(layouts_);
+    }
+
+    std::vector<vk::DescriptorSet> DescriptorPool::allocate_sets(const std::vector<vk::DescriptorSetLayout> &layouts) const {
+        vk::DescriptorSetAllocateInfo ai{};
+        ai.descriptorPool = m_descriptor_pool;
+        ai.setSetLayouts(layouts);
+
+        return m_context->device().allocateDescriptorSets(ai);
+    }
+
+    std::vector<vk::DescriptorSet> DescriptorPool::allocate_sets(const std::shared_ptr<kat::DescriptorSetLayout> &layout, size_t count) const {
+        return allocate_sets(layout->handle(), count);
+    }
+
+    std::vector<vk::DescriptorSet> DescriptorPool::allocate_sets(const vk::DescriptorSetLayout &layout, size_t count) const {
+        return allocate_sets(std::vector<vk::DescriptorSetLayout>(count, layout));
+    }
+
 } // namespace kat

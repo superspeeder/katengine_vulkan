@@ -239,6 +239,11 @@ namespace kat {
             map_and_write(data.data(), data.size() * sizeof(T), offset);
         };
 
+        template <typename T>
+        void map_and_write_obj(const T &data, const vk::DeviceSize &offset) const {
+            map_and_write(&data, sizeof(T), offset);
+        };
+
         void copy_from(const std::shared_ptr<Buffer> &other, const vk::DeviceSize &size, const vk::DeviceSize &src_offset, const vk::DeviceSize &dst_offset) const;
 
         [[nodiscard]] inline vk::Buffer handle() const { return m_buffer; };

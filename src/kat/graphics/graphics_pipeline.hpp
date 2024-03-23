@@ -33,22 +33,65 @@ namespace kat {
         std::vector<VertexBinding> bindings;
     };
 
+    class DescriptorSetLayout {
+      public:
+        struct Description {
+            std::vector<vk::DescriptorSetLayoutBinding> bindings;
+        };
+
+        DescriptorSetLayout(const std::shared_ptr<Context> &context, const Description &desc);
+
+        [[nodiscard]] inline vk::DescriptorSetLayout handle() const { return m_descriptor_set_layout; };
+
+      private:
+        std::shared_ptr<Context> m_context;
+
+        vk::DescriptorSetLayout m_descriptor_set_layout;
+    };
+
     class PipelineLayout {
       public:
         struct Description {
             // todo descriptors
 
             std::vector<vk::PushConstantRange> push_constant_ranges;
+
+            std::vector<std::shared_ptr<DescriptorSetLayout>> descriptor_set_layouts;
         };
 
         PipelineLayout(const std::shared_ptr<Context> &context, const Description &desc);
 
         [[nodiscard]] inline vk::PipelineLayout handle() const { return m_pipeline_layout; };
 
+        void bind_descriptor_sets(const vk::CommandBuffer &cmd, const vk::PipelineBindPoint &bind_point, uint32_t first_set, const std::vector<vk::DescriptorSet> &sets,
+                                  const std::vector<uint32_t> &dynamic_offsets) const;
+
       private:
         std::shared_ptr<Context> m_context;
 
         vk::PipelineLayout m_pipeline_layout;
+    };
+
+    class DescriptorPool {
+      public:
+        struct Description {
+            uint32_t                            max_sets;
+            std::vector<vk::DescriptorPoolSize> pool_sizes;
+        };
+
+        DescriptorPool(const std::shared_ptr<Context> &context, const Description &desc);
+
+        [[nodiscard]] inline vk::DescriptorPool handle() const { return m_descriptor_pool; };
+
+        std::vector<vk::DescriptorSet> allocate_sets(const std::vector<std::shared_ptr<kat::DescriptorSetLayout>> &layouts) const;
+        std::vector<vk::DescriptorSet> allocate_sets(const std::vector<vk::DescriptorSetLayout> &layouts) const;
+        std::vector<vk::DescriptorSet> allocate_sets(const std::shared_ptr<kat::DescriptorSetLayout> &layout, size_t count) const;
+        std::vector<vk::DescriptorSet> allocate_sets(const vk::DescriptorSetLayout &layout, size_t count) const;
+
+      private:
+        std::shared_ptr<Context> m_context;
+
+        vk::DescriptorPool m_descriptor_pool;
     };
 
     class GraphicsPipeline {
@@ -115,14 +158,14 @@ namespace kat {
             std::shared_ptr<RenderPass>     render_pass;
             uint32_t                        subpass;
 
-            Description& add_shader(const ShaderId& id, vk::ShaderStageFlagBits stage, const std::string& entry_point = "main");
+            Description &add_shader(const ShaderId &id, vk::ShaderStageFlagBits stage, const std::string &entry_point = "main");
         };
 
         GraphicsPipeline(const std::shared_ptr<Context> &context, const Description &desc);
 
         [[nodiscard]] inline vk::Pipeline handle() const { return m_pipeline; };
 
-        void bind(const vk::CommandBuffer& cmd) const;
+        void bind(const vk::CommandBuffer &cmd) const;
 
       private:
         std::shared_ptr<Context> m_context;
