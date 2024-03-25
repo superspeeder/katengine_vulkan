@@ -16,6 +16,6 @@ int main() {
     }
 
     glfwTerminate();
-    
+
     return ec;
 }

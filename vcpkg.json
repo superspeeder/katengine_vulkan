@@ -1,0 +1,10 @@
+{
+  "name" : "gaming2",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "f7c5a7c8fc7b8785df379b8494f323cd3182ca4c",
+  "dependencies" : [ {
+    "name" : "imgui",
+    "version>=" : "1.90#4",
+    "features": ["docking-experimental", "freetype", "glfw-binding", "vulkan-binding"]
+  } ]
+}

@@ -2,7 +2,6 @@
 
 #include <string>
 
-#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
@@ -29,7 +28,7 @@ namespace kat {
 
         static void poll();
 
-        [[nodiscard]] inline GLFWwindow *window() const { return m_window; }
+        [[nodiscard]] inline GLFWwindow *handle() const { return m_window; }
 
         [[nodiscard]] bool get_key(int key) const;
 

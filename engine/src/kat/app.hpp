@@ -1,12 +1,21 @@
 #pragma once
 
 #include "kat/graphics/context.hpp"
+#include "kat/graphics/graphics_pipeline.hpp"
 #include "kat/graphics/window.hpp"
+
+#include <imgui.h>
 
 #include <atomic>
 #include <thread>
 
 namespace kat {
+
+    struct ImGuiResources {
+        explicit ImGuiResources(const std::unique_ptr<Window> &window, const std::shared_ptr<Context> &context);
+
+        std::shared_ptr<DescriptorPool> descriptor_pool;
+    };
 
     class App {
       public:
