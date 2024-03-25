@@ -35,7 +35,9 @@ namespace kat {
 
         [[nodiscard]] vk::SurfaceKHR create_surface(const vk::Instance &instance) const;
 
-        [[nodiscard]] const glm::ivec2 &size() const { return m_size; };
+        [[nodiscard]] inline const glm::ivec2 &size() const { return m_size; };
+
+        [[nodiscard]] inline float aspect() const { return static_cast<float>(m_size.y) / static_cast<float>(m_size.x); };
 
       private:
         GLFWwindow *m_window;

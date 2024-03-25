@@ -13,3 +13,6 @@
 [submodule "libs/VulkanMemoryAllocator"]
 	path = libs/VulkanMemoryAllocator
 	url = git@github.com:GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "libs/imgui"]
+	path = libs/imgui
+	url = git@github.com:ocornut/imgui.git

@@ -3,11 +3,15 @@
   <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$" />
   <component name="CidrRootsConfiguration">
     <sourceRoots>
-      <file path="$PROJECT_DIR$/src" />
+      <file path="$PROJECT_DIR$/engine/src" />
+      <file path="$PROJECT_DIR$/game/src" />
     </sourceRoots>
     <libraryRoots>
       <file path="$PROJECT_DIR$/libs" />
     </libraryRoots>
+    <excludeRoots>
+      <file path="$PROJECT_DIR$/src" />
+    </excludeRoots>
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
