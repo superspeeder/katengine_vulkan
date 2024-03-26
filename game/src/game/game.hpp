@@ -45,13 +45,15 @@ namespace game {
 
     class Game : public kat::App {
       public:
-        Game();
+        Game(const std::filesystem::path& resources_dir);
         ~Game() override = default;
 
         void create_render_pass();
         void create_pipeline_layout();
         void create_graphics_pipeline();
         void create_buffers();
+
+        void render_ui();
 
         void update(float dt) override;
         void render(const kat::FrameInfo &frame_info, float dt) override;
@@ -77,6 +79,19 @@ namespace game {
 
         std::vector<std::shared_ptr<kat::Buffer>> m_uniform_buffers;
         std::vector<vk::DescriptorSet>            m_descriptor_sets;
+
+        std::unique_ptr<kat::ImGuiResources> m_imgui_resources;
+
+        bool m_demowindow_open = true;
+
+        kat::color m_background_color = kat::BLACK;
+        kat::color m_light_color = kat::WHITE;
+        kat::color m_ambient_light_color = kat::WHITE;
+        float m_ambient_strength = 0.05f;
+        float m_specular_strength = 0.5f;
+        glm::vec4 m_light_pos = glm::vec4{0.5f, -2.0f, 1.5f, 1.0f};
+
+        std::shared_ptr<kat::Image> m_test_image;
     };
 
 } // namespace game

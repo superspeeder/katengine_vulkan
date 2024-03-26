@@ -1,5 +1,8 @@
 #include "kat/graphics/context.hpp"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #include <GLFW/glfw3.h>
 #include <set>
 
@@ -297,6 +300,12 @@ namespace kat {
         m_device.destroy(fence);
     }
 
+    void Context::single_time_commands(const std::function<void(const vk::CommandBuffer &)> &f) const {
+        auto cmd = begin_single_time_commands();
+        f(cmd);
+        end_single_time_commands(cmd);
+    }
+
     Buffer::Buffer(const std::shared_ptr<Context> &context, vk::Buffer buffer, VmaAllocation allocation, VmaAllocationInfo allocation_info)
         : m_buffer(buffer), m_allocation(allocation), m_allocation_info(allocation_info), m_context(context) {}
 
@@ -410,5 +419,82 @@ namespace kat {
         vmaUnmapMemory(m_allocator, alloc);
     }
 
+    std::shared_ptr<Image> GpuAllocator::load_image(const std::filesystem::path &path) const {
+        std::string path_ = path.string();
 
+        int width, height;
+        int components;
+
+        unsigned char *data = stbi_load(path_.c_str(), &width, &height, &components, 0);
+
+        vk::Format format = vk::Format::eR8G8B8A8Unorm;
+
+        switch (components) {
+        case 1:
+            format = vk::Format::eR8Unorm;
+            break;
+        case 2:
+            format = vk::Format::eR8G8Unorm;
+            break;
+        case 3:
+            format = vk::Format::eR8G8B8Unorm;
+            break;
+        case 4:
+            format = vk::Format::eR8G8B8A8Unorm;
+            break;
+        }
+
+        auto image = init_image(width, height, components, format, data, vk::ImageUsageFlagBits::eSampled, vk::ImageLayout::eShaderReadOnlyOptimal, true);
+        stbi_image_free(data);
+
+        return image;
+    }
+
+    std::shared_ptr<Image> GpuAllocator::init_image(uint32_t width, uint32_t height, uint32_t pixel_size, vk::Format format, unsigned char *data,
+                                                    const vk::ImageUsageFlags &image_usage_flags, vk::ImageLayout il, bool gpu_only) const {
+        auto buffer = init_buffer(data, width * height * pixel_size, vk::BufferUsageFlagBits::eTransferSrc, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        auto image = create_image(vk::ImageCreateInfo({}, vk::ImageType::e2D, format, vk::Extent3D(width, height, 1), 1, 1, vk::SampleCountFlagBits::e1,
+                                                      gpu_only ? vk::ImageTiling::eOptimal : vk::ImageTiling::eLinear, vk::ImageUsageFlagBits::eTransferDst | image_usage_flags,
+                                                      vk::SharingMode::eExclusive, {}, vk::ImageLayout::eUndefined),
+                                  VMA_MEMORY_USAGE_GPU_ONLY);
+
+
+        buffer->map_and_write(data, width * height * pixel_size, 0);
+
+        vk::BufferImageCopy copy{};
+        copy.bufferOffset                    = 0;
+        copy.bufferRowLength                 = 0;
+        copy.bufferImageHeight               = 0;
+        copy.imageSubresource.aspectMask     = vk::ImageAspectFlagBits::eColor;
+        copy.imageSubresource.mipLevel       = 0;
+        copy.imageSubresource.baseArrayLayer = 0;
+        copy.imageSubresource.layerCount     = 1;
+        copy.imageOffset                     = vk::Offset3D{0, 0, 0};
+        copy.imageExtent                     = vk::Extent3D{width, height, 1};
+
+        m_context->single_time_commands([&](const vk::CommandBuffer &cmd) {
+            transitionImageLayout(cmd, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, vk::PipelineStageFlagBits::eTransfer,
+                                  vk::PipelineStageFlagBits::eTransfer);
+            cmd.copyBufferToImage(buffer->handle(), image->handle(), vk::ImageLayout::eTransferDstOptimal, copy);
+            transitionImageLayout(cmd, image, vk::ImageLayout::eUndefined, il, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer);
+        });
+
+        return image;
+    }
+
+    void transitionImageLayout(const vk::CommandBuffer &cmd, const std::shared_ptr<Image> &image, vk::ImageLayout initial_layout, vk::ImageLayout final_layout,
+                               vk::PipelineStageFlagBits source_stage, vk::PipelineStageFlagBits dest_stage) {
+        vk::ImageMemoryBarrier imb{};
+        imb.image               = image->handle();
+        imb.oldLayout           = initial_layout;
+        imb.newLayout           = final_layout;
+        imb.srcAccessMask       = vk::AccessFlagBits::eNone;
+        imb.dstAccessMask       = vk::AccessFlagBits::eNone;
+        imb.subresourceRange    = vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1);
+        imb.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imb.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+        cmd.pipelineBarrier(source_stage, dest_stage, vk::DependencyFlags{}, {}, {}, imb);
+    }
 } // namespace kat

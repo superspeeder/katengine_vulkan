@@ -9,6 +9,8 @@
 #include "kat/util/util.hpp"
 
 #include <vk_mem_alloc.h>
+#include <functional>
+#include <filesystem>
 
 namespace kat {
 
@@ -185,6 +187,8 @@ namespace kat {
 
         void end_single_time_commands(const vk::CommandBuffer &cmd) const;
 
+        void single_time_commands(const std::function<void(const vk::CommandBuffer&)>& f) const;
+
       private:
         vkb::Instance       m_inst;
         vkb::PhysicalDevice m_phys;
@@ -298,6 +302,10 @@ namespace kat {
         [[nodiscard]] std::shared_ptr<Buffer> init_buffer(const void *data, const vk::DeviceSize &size, const vk::BufferUsageFlags usage,
                                                           const VmaMemoryUsage &vma_memory_usage = VMA_MEMORY_USAGE_AUTO) const;
 
+        [[nodiscard]] std::shared_ptr<Image> load_image(const std::filesystem::path& path) const;
+
+        [[nodiscard]] std::shared_ptr<Image> init_image(uint32_t width, uint32_t height, uint32_t pixel_size, vk::Format format, unsigned char* data, const vk::ImageUsageFlags& image_usage_flags, vk::ImageLayout il, bool gpu_only) const;
+
         [[nodiscard]] void *map(const VmaAllocation &alloc) const;
 
         void unmap(const VmaAllocation &alloc) const;
@@ -346,4 +354,6 @@ namespace kat {
     inline uint32_t Context::get_queue_family<QueueType::COMPUTE>() const {
         return m_compute_family;
     };
+
+    void transitionImageLayout(const vk::CommandBuffer& cmd, const std::shared_ptr<Image> &image, vk::ImageLayout initial_layout, vk::ImageLayout final_layout, vk::PipelineStageFlagBits source_stage, vk::PipelineStageFlagBits dest_stage);
 } // namespace kat

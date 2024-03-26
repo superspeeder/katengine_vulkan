@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <filesystem>
 
 namespace kat {
     struct ShaderId {
@@ -14,6 +15,8 @@ namespace kat {
 
         inline ShaderId(const std::string &path_) : path(path_) {};
         inline ShaderId(const char* path_) : path(path_) {};
+
+        inline ShaderId(const std::filesystem::path& path_) : path(path_.string()) {};
 
         std::vector<uint32_t> load_code() const;
 

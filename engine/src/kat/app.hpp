@@ -8,18 +8,13 @@
 
 #include <atomic>
 #include <thread>
+#include <filesystem>
 
 namespace kat {
 
-    struct ImGuiResources {
-        explicit ImGuiResources(const std::unique_ptr<Window> &window, const std::shared_ptr<Context> &context);
-
-        std::shared_ptr<DescriptorPool> descriptor_pool;
-    };
-
     class App {
       public:
-        App(const WindowSettings &window_settings, const ContextSettings &context_settings);
+        App(const WindowSettings &window_settings, const ContextSettings &context_settings, const std::filesystem::path& resources_dir);
         virtual ~App() = default;
 
         virtual void update(float dt)                                   = 0;
@@ -43,6 +38,8 @@ namespace kat {
 
         [[nodiscard]] inline float update_delta() const { return m_update_delta; }
 
+        [[nodiscard]] inline std::filesystem::path resource_path(const std::filesystem::path& path) const { return m_resources_dir / path; };
+
       protected:
         std::unique_ptr<Window>  m_window;
         std::shared_ptr<Context> m_context;
@@ -54,6 +51,15 @@ namespace kat {
 
         float m_this_frame, m_last_frame, m_render_delta;
         float m_this_update, m_last_update, m_update_delta;
+
+        std::filesystem::path m_resources_dir;
+    };
+
+
+    struct ImGuiResources {
+        explicit ImGuiResources(const std::unique_ptr<Window> &window, const std::shared_ptr<Context> &context, vk::RenderPass render_pass);
+
+        std::shared_ptr<DescriptorPool> descriptor_pool;
     };
 
 } // namespace kat

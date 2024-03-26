@@ -4,7 +4,7 @@
 #include <imgui_impl_vulkan.h>
 
 namespace kat {
-    App::App(const WindowSettings &window_settings, const ContextSettings &context_settings) {
+    App::App(const WindowSettings &window_settings, const ContextSettings &context_settings, const std::filesystem::path& resources_dir) : m_resources_dir(resources_dir) {
         glfwInit();
         m_window = std::make_unique<Window>(window_settings);
 
@@ -28,7 +28,7 @@ namespace kat {
                 m_context->present();
 
                 m_last_frame   = m_this_frame;
-                m_last_frame   = static_cast<float>(glfwGetTime());
+                m_this_frame   = static_cast<float>(glfwGetTime());
                 m_render_delta = m_this_frame - m_last_frame;
             }
         });
@@ -49,7 +49,7 @@ namespace kat {
         m_context->device().waitIdle();
     }
 
-    ImGuiResources::ImGuiResources(const std::unique_ptr<Window> &window, const std::shared_ptr<Context> &context) {
+    ImGuiResources::ImGuiResources(const std::unique_ptr<Window> &window, const std::shared_ptr<Context> &context, vk::RenderPass render_pass) {
         {
             kat::DescriptorPool::Description desc{};
             desc.max_sets   = 1000;
@@ -84,6 +84,9 @@ namespace kat {
         init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
         init_info.DescriptorPool = descriptor_pool->handle();
 
-        ImGui_ImplVulkan_Init(&init_info, )
+        ImGui_ImplVulkan_Init(&init_info, render_pass);
+
+        ImGui_ImplVulkan_CreateFontsTexture();
+
     }
 } // namespace kat
