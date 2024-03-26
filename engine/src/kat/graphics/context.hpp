@@ -8,9 +8,10 @@
 
 #include "kat/util/util.hpp"
 
-#include <vk_mem_alloc.h>
-#include <functional>
 #include <filesystem>
+#include <functional>
+#include <vk_mem_alloc.h>
+#include <tuple>
 
 namespace kat {
 
@@ -187,7 +188,7 @@ namespace kat {
 
         void end_single_time_commands(const vk::CommandBuffer &cmd) const;
 
-        void single_time_commands(const std::function<void(const vk::CommandBuffer&)>& f) const;
+        void single_time_commands(const std::function<void(const vk::CommandBuffer &)> &f) const;
 
       private:
         vkb::Instance       m_inst;
@@ -302,9 +303,10 @@ namespace kat {
         [[nodiscard]] std::shared_ptr<Buffer> init_buffer(const void *data, const vk::DeviceSize &size, const vk::BufferUsageFlags usage,
                                                           const VmaMemoryUsage &vma_memory_usage = VMA_MEMORY_USAGE_AUTO) const;
 
-        [[nodiscard]] std::shared_ptr<Image> load_image(const std::filesystem::path& path) const;
+        [[nodiscard]] std::tuple<std::shared_ptr<Image>, vk::Format, vk::Extent2D> load_image(const std::filesystem::path &path) const;
 
-        [[nodiscard]] std::shared_ptr<Image> init_image(uint32_t width, uint32_t height, uint32_t pixel_size, vk::Format format, unsigned char* data, const vk::ImageUsageFlags& image_usage_flags, vk::ImageLayout il, bool gpu_only) const;
+        [[nodiscard]] std::shared_ptr<Image> init_image(uint32_t width, uint32_t height, uint32_t pixel_size, vk::Format format, unsigned char *data,
+                                                        const vk::ImageUsageFlags &image_usage_flags, vk::ImageLayout il, bool gpu_only) const;
 
         [[nodiscard]] void *map(const VmaAllocation &alloc) const;
 
@@ -313,6 +315,60 @@ namespace kat {
       private:
         std::shared_ptr<Context> m_context;
         VmaAllocator             m_allocator = VK_NULL_HANDLE;
+    };
+
+    class ImageView {
+      public:
+        struct Description {
+            std::shared_ptr<Image>    image;
+            vk::ImageViewType         type;
+            vk::Format                format;
+            vk::ComponentMapping      component_mapping = kat::STANDARD_COMPONENT_MAPPING;
+            vk::ImageSubresourceRange subresource_range = kat::SIMPLE_SUBRESOURCE_RANGE;
+
+            //  setting this to a value will add a vk::ImageViewUsageCreateInfo struct to the pNext chain of the vk::ImageViewCreateInfo
+            std::optional<vk::ImageUsageFlags> restricted_usage = std::nullopt;
+        };
+
+        ImageView(const std::shared_ptr<Context> &context, const Description &desc);
+        ~ImageView();
+
+        [[nodiscard]] inline vk::ImageView handle() const { return m_image_view; };
+
+      private:
+        std::shared_ptr<Context> m_context;
+        vk::ImageView            m_image_view;
+        Description              m_description;
+    };
+
+    class Sampler {
+      public:
+        struct Description {
+            vk::Filter             mag_filter               = vk::Filter::eLinear;
+            vk::Filter             min_filter               = vk::Filter::eLinear;
+            vk::SamplerMipmapMode  mipmap_mode              = vk::SamplerMipmapMode::eNearest;
+            vk::SamplerAddressMode address_mode_u           = vk::SamplerAddressMode::eClampToEdge;
+            vk::SamplerAddressMode address_mode_v           = vk::SamplerAddressMode::eClampToEdge;
+            vk::SamplerAddressMode address_mode_w           = vk::SamplerAddressMode::eClampToEdge;
+            float                  min_lod_bias             = 0.0f;
+            bool                   enable_anisotropy        = true;
+            float                  max_anisotropy           = 1.0f;
+            bool                   enable_compare           = false;
+            vk::CompareOp          compare_op               = vk::CompareOp::eAlways;
+            float                  min_lod                  = 0.0f;
+            float                  max_lod                  = 0.0f;
+            vk::BorderColor        border_color             = vk::BorderColor::eIntOpaqueBlack;
+            bool                   unnormalized_coordinates = false;
+        };
+
+        Sampler(const std::shared_ptr<Context> &context, const Description &desc);
+        ~Sampler();
+
+        [[nodiscard]] inline vk::Sampler handle() const { return m_sampler; };
+
+      private:
+        std::shared_ptr<Context> m_context;
+        vk::Sampler              m_sampler;
     };
 
     template <>
@@ -355,5 +411,6 @@ namespace kat {
         return m_compute_family;
     };
 
-    void transitionImageLayout(const vk::CommandBuffer& cmd, const std::shared_ptr<Image> &image, vk::ImageLayout initial_layout, vk::ImageLayout final_layout, vk::PipelineStageFlagBits source_stage, vk::PipelineStageFlagBits dest_stage);
+    void transitionImageLayout(const vk::CommandBuffer &cmd, const std::shared_ptr<Image> &image, vk::ImageLayout initial_layout, vk::ImageLayout final_layout,
+                               vk::PipelineStageFlagBits source_stage, vk::PipelineStageFlagBits dest_stage);
 } // namespace kat

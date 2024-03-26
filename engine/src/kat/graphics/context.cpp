@@ -54,6 +54,7 @@ namespace kat {
         features.tessellationShader = true;
         features.wideLines          = true;
         features.largePoints        = true;
+        features.samplerAnisotropy  = true;
 
         features11.variablePointers              = true;
         features11.variablePointersStorageBuffer = true;
@@ -419,7 +420,7 @@ namespace kat {
         vmaUnmapMemory(m_allocator, alloc);
     }
 
-    std::shared_ptr<Image> GpuAllocator::load_image(const std::filesystem::path &path) const {
+    std::tuple<std::shared_ptr<Image>, vk::Format, vk::Extent2D> GpuAllocator::load_image(const std::filesystem::path &path) const {
         std::string path_ = path.string();
 
         int width, height;
@@ -447,7 +448,7 @@ namespace kat {
         auto image = init_image(width, height, components, format, data, vk::ImageUsageFlagBits::eSampled, vk::ImageLayout::eShaderReadOnlyOptimal, true);
         stbi_image_free(data);
 
-        return image;
+        return std::make_tuple(image, format, vk::Extent2D(width, height));
     }
 
     std::shared_ptr<Image> GpuAllocator::init_image(uint32_t width, uint32_t height, uint32_t pixel_size, vk::Format format, unsigned char *data,
@@ -481,6 +482,53 @@ namespace kat {
         });
 
         return image;
+    }
+
+    ImageView::ImageView(const std::shared_ptr<Context> &context, const Description &desc) : m_context(context), m_description(desc) {
+        vk::ImageViewCreateInfo ivci{};
+        ivci.image            = m_description.image->handle();
+        ivci.viewType         = m_description.type;
+        ivci.format           = m_description.format;
+        ivci.components       = m_description.component_mapping;
+        ivci.subresourceRange = m_description.subresource_range;
+
+        vk::ImageViewUsageCreateInfo ivuci{};
+
+        if (m_description.restricted_usage.has_value()) {
+            ivuci.usage = m_description.restricted_usage.value();
+            ivci.pNext  = &ivuci;
+        }
+
+        m_image_view = m_context->device().createImageView(ivci);
+    }
+
+    ImageView::~ImageView() {
+        m_context->device().destroy(m_image_view);
+    }
+
+    Sampler::Sampler(const std::shared_ptr<Context> &context, const Description &desc) : m_context(context) {
+        vk::SamplerCreateInfo sci{};
+        sci.magFilter               = desc.mag_filter;
+        sci.minFilter               = desc.min_filter;
+        sci.mipmapMode              = desc.mipmap_mode;
+        sci.addressModeU            = desc.address_mode_u;
+        sci.addressModeV            = desc.address_mode_v;
+        sci.addressModeW            = desc.address_mode_w;
+        sci.mipLodBias              = desc.min_lod_bias;
+        sci.anisotropyEnable        = desc.enable_anisotropy;
+        sci.maxAnisotropy           = desc.max_anisotropy;
+        sci.compareEnable           = desc.enable_compare;
+        sci.compareOp               = desc.compare_op;
+        sci.minLod                  = desc.min_lod;
+        sci.maxLod                  = desc.max_lod;
+        sci.borderColor             = desc.border_color;
+        sci.unnormalizedCoordinates = desc.unnormalized_coordinates;
+
+        m_sampler = m_context->device().createSampler(sci);
+    }
+
+    Sampler::~Sampler() {
+        m_context->device().destroy(m_sampler);
     }
 
     void transitionImageLayout(const vk::CommandBuffer &cmd, const std::shared_ptr<Image> &image, vk::ImageLayout initial_layout, vk::ImageLayout final_layout,

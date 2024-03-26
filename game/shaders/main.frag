@@ -3,6 +3,7 @@
 layout(location = 0) in vec4 fragColor;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec4 fragPos;
+layout(location = 3) in vec2 fragTexCoords;
 
 layout(location = 0) out vec4 outColor;
 
@@ -20,8 +21,12 @@ layout(binding = 0) uniform uniform_buffer {
     float specularStrength;
 } ubo;
 
+layout(binding = 1) uniform sampler2D texSampler;
+
 void main() {
-    vec4 objectColor = vec4(0.2, 0.2, 0.2, 1.0);
+    vec4 objectColor = texture(texSampler, fragTexCoords);
+//    vec4 objectColor = vec4(fragTexCoords, 1.0, 1.0);
+//    vec4 objectColor = fragColor;
 
     vec3 ambient = ubo.ambientStrength * ubo.ambientColor.rgb;
 

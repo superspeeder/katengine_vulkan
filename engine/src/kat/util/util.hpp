@@ -78,4 +78,6 @@ namespace kat {
         kat::COLOR_COMPONENT_FLAGS_RGBA,
     };
 
+    constexpr vk::ComponentMapping STANDARD_COMPONENT_MAPPING = vk::ComponentMapping(vk::ComponentSwizzle::eR, vk::ComponentSwizzle::eG, vk::ComponentSwizzle::eB, vk::ComponentSwizzle::eA); 
+    constexpr vk::ImageSubresourceRange SIMPLE_SUBRESOURCE_RANGE = vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1);
 } // namespace kat

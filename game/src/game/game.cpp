@@ -1,18 +1,27 @@
 #include "game.hpp"
 
-#include <glm/gtx/string_cast.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <iostream>
 
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
-
-
+#include <tuple>
 
 namespace game {
-    Game::Game(const std::filesystem::path& resources_dir) : kat::App({.title = "Window", .fullscreen = true}, {}, resources_dir) {
+    Game::Game(const std::filesystem::path &resources_dir) : kat::App({.title = "Window", .fullscreen = true}, {}, resources_dir) {
         m_command_pool    = m_context->create_command_pool_raw<kat::QueueType::GRAPHICS>();
         m_command_buffers = m_context->allocate_command_buffers_raw<kat::MAX_FRAMES_IN_FLIGHT>(m_command_pool);
+
+        
+        auto image_ = m_context->gpu_allocator()->load_image(resource_path("textures/test_texture.png"));
+        m_test_image = std::get<0>(image_);
+        m_test_image_view = std::make_shared<kat::ImageView>(m_context, kat::ImageView::Description{m_test_image, vk::ImageViewType::e2D, std::get<1>(image_)});
+        {
+            kat::Sampler::Description desc{};
+            desc.mag_filter = vk::Filter::eNearest;
+            m_test_sampler = std::make_shared<kat::Sampler>(m_context, desc);
+        }
 
         create_render_pass();
         create_buffers();
@@ -21,13 +30,12 @@ namespace game {
 
         m_imgui_resources = std::make_unique<kat::ImGuiResources>(window(), context(), m_render_pass->handle());
 
-        ImGuiIO& io = ImGui::GetIO(); (void)io;
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+        ImGuiIO &io = ImGui::GetIO();
+        (void)io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
 
         ImGui::StyleColorsDark();
-
-        m_test_image = m_context->gpu_allocator()->load_image(resource_path("textures/test_texture.png"));
     }
 
     void Game::create_render_pass() {
@@ -64,7 +72,8 @@ namespace game {
 
         {
             kat::DescriptorSetLayout::Description desc{};
-            desc.bindings = {vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eAllGraphics, {})};
+            desc.bindings = {vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eAllGraphics, {}),
+                             vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, {})};
 
             m_descriptor_set_layout = std::make_shared<kat::DescriptorSetLayout>(m_context, desc);
         }
@@ -81,7 +90,8 @@ namespace game {
         {
             kat::DescriptorPool::Description desc{};
             desc.max_sets     = kat::MAX_FRAMES_IN_FLIGHT;
-            desc.pool_sizes   = {vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, kat::MAX_FRAMES_IN_FLIGHT)};
+            desc.pool_sizes   = {vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, kat::MAX_FRAMES_IN_FLIGHT),
+                                 vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, kat::MAX_FRAMES_IN_FLIGHT)};
             m_descriptor_pool = std::make_shared<kat::DescriptorPool>(m_context, desc);
         }
 
@@ -93,14 +103,17 @@ namespace game {
             dbi.offset = 0;
             dbi.range  = sizeof(UniformBuffer);
 
-            vk::WriteDescriptorSet write{};
-            write.dstSet          = m_descriptor_sets[i];
-            write.dstBinding      = 0;
-            write.dstArrayElement = 0;
-            write.descriptorType  = vk::DescriptorType::eUniformBuffer;
-            write.setBufferInfo(dbi);
+            vk::DescriptorImageInfo dii{};
+            dii.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+            dii.imageView = m_test_image_view->handle();
+            dii.sampler = m_test_sampler->handle();
 
-            m_context->device().updateDescriptorSets(write, {});
+            std::vector<vk::WriteDescriptorSet> writes = {
+                vk::WriteDescriptorSet(m_descriptor_sets[i], 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &dbi, nullptr),
+                vk::WriteDescriptorSet(m_descriptor_sets[i], 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &dii, nullptr, nullptr),
+            };
+
+            m_context->device().updateDescriptorSets(writes, {});
         }
     }
 
@@ -123,6 +136,7 @@ namespace game {
                                                               kat::VertexAttribute{0, vk::Format::eR32G32B32Sfloat, 0},
                                                               kat::VertexAttribute{1, vk::Format::eR32G32B32A32Sfloat, offsetof(Vertex, color)},
                                                               kat::VertexAttribute{2, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, normal)},
+                                                              kat::VertexAttribute{3, vk::Format::eR32G32Sfloat, offsetof(Vertex, tex_coords)},
                                                           },
                                                           vk::VertexInputRate::eVertex}};
 
@@ -136,52 +150,52 @@ namespace game {
     void Game::create_buffers() {
         const std::vector<Vertex> vertices = {
             // back
-            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(0.0f, -0.0f, -1.0f)},
-            Vertex{glm::vec3(0.5f, 0.5f, -0.5f), kat::RED, glm::vec3(0.0f, -0.0f, -1.0f)},
-            Vertex{glm::vec3(0.5f, -0.5f, -0.5f), kat::GREEN, glm::vec3(0.0f, -0.0f, -1.0f)},
-            Vertex{glm::vec3(0.5f, -0.5f, -0.5f), kat::GREEN, glm::vec3(0.0f, -0.0f, -1.0f)},
-            Vertex{glm::vec3(-0.5f, -0.5f, -0.5f), kat::BLUE, glm::vec3(0.0f, -0.0f, -1.0f)},
-            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(0.0f, -0.0f, -1.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(0.0f, -0.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, 0.5f, -0.5f), kat::RED, glm::vec3(0.0f, -0.0f, -1.0f), glm::vec2(1.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, -0.5f), kat::GREEN, glm::vec3(0.0f, -0.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, -0.5f), kat::GREEN, glm::vec3(0.0f, -0.0f, -1.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, -0.5f, -0.5f), kat::BLUE, glm::vec3(0.0f, -0.0f, -1.0f), glm::vec2(0.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(0.0f, -0.0f, -1.0f), glm::vec2(0.0f, 0.0f)},
 
             // front
-            Vertex{glm::vec3(0.5f, 0.5f, 0.5f), kat::CYAN, glm::vec3(0.0f, -0.0f, 1.0f)},
-            Vertex{glm::vec3(-0.5f, 0.5f, 0.5f), kat::WHITE, glm::vec3(0.0f, -0.0f, 1.0f)},
-            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(0.0f, -0.0f, 1.0f)},
-            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(0.0f, -0.0f, 1.0f)},
-            Vertex{glm::vec3(-0.5f, 0.5f, 0.5f), kat::WHITE, glm::vec3(0.0f, -0.0f, 1.0f)},
-            Vertex{glm::vec3(-0.5f, -0.5f, 0.5f), kat::YELLOW, glm::vec3(0.0f, -0.0f, 1.0f)},
+            Vertex{glm::vec3(0.5f, 0.5f, 0.5f), kat::CYAN, glm::vec3(0.0f, -0.0f, 1.0f), glm::vec2(1.0f, 0.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, 0.5f), kat::WHITE, glm::vec3(0.0f, -0.0f, 1.0f), glm::vec2(0.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(0.0f, -0.0f, 1.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(0.0f, -0.0f, 1.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, 0.5f), kat::WHITE, glm::vec3(0.0f, -0.0f, 1.0f), glm::vec2(0.0f, 0.0f)},
+            Vertex{glm::vec3(-0.5f, -0.5f, 0.5f), kat::YELLOW, glm::vec3(0.0f, -0.0f, 1.0f), glm::vec2(0.0f, 1.0f)},
 
             // left
-            Vertex{glm::vec3(-0.5f, -0.5f, -0.5f), kat::BLUE, glm::vec3(-1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, -0.5f, 0.5f), kat::YELLOW, glm::vec3(-1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(-1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(-1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, -0.5f, 0.5f), kat::YELLOW, glm::vec3(-1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, 0.5f, 0.5f), kat::WHITE, glm::vec3(-1.0f, -0.0f, 0.0f)},
+            Vertex{glm::vec3(-0.5f, -0.5f, -0.5f), kat::BLUE, glm::vec3(-1.0f, -0.0f, 0.0f), glm::vec2(0.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, -0.5f, 0.5f), kat::YELLOW, glm::vec3(-1.0f, -0.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(-1.0f, -0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(-1.0f, -0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+            Vertex{glm::vec3(-0.5f, -0.5f, 0.5f), kat::YELLOW, glm::vec3(-1.0f, -0.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, 0.5f), kat::WHITE, glm::vec3(-1.0f, -0.0f, 0.0f), glm::vec2(1.0f, 0.0f)},
 
             // right
-            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, -0.5f, -0.5f), kat::GREEN, glm::vec3(1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, 0.5f, -0.5f), kat::RED, glm::vec3(1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, 0.5f, -0.5f), kat::RED, glm::vec3(1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, 0.5f, 0.5f), kat::CYAN, glm::vec3(1.0f, -0.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(1.0f, -0.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(1.0f, -0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, -0.5f), kat::GREEN, glm::vec3(1.0f, -0.0f, 0.0f), glm::vec2(1.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, 0.5f, -0.5f), kat::RED, glm::vec3(1.0f, -0.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(0.5f, 0.5f, -0.5f), kat::RED, glm::vec3(1.0f, -0.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(0.5f, 0.5f, 0.5f), kat::CYAN, glm::vec3(1.0f, -0.0f, 0.0f), glm::vec2(0.0f, 1.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(1.0f, -0.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
 
             // bottom
-            Vertex{glm::vec3(0.5f, 0.5f, -0.5f), kat::RED, glm::vec3(0.0f, 1.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(0.0f, 1.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, 0.5f, 0.5f), kat::CYAN, glm::vec3(0.0f, 1.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, 0.5f, 0.5f), kat::WHITE, glm::vec3(0.0f, 1.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, 0.5f, 0.5f), kat::CYAN, glm::vec3(0.0f, 1.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(0.0f, 1.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, 0.5f, -0.5f), kat::RED, glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(1.0f, 0.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, 0.5f, 0.5f), kat::CYAN, glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, 0.5f), kat::WHITE, glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 1.0f)},
+            Vertex{glm::vec3(0.5f, 0.5f, 0.5f), kat::CYAN, glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, 0.5f, -0.5f), kat::BLACK, glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
 
             // top
-            Vertex{glm::vec3(-0.5f, -0.5f, -0.5f), kat::BLUE, glm::vec3(0.0f, -1.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, -0.5f, -0.5f), kat::GREEN, glm::vec3(0.0f, -1.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(0.0f, -1.0f, 0.0f)},
-            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(0.0f, -1.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, -0.5f, 0.5f), kat::YELLOW, glm::vec3(0.0f, -1.0f, 0.0f)},
-            Vertex{glm::vec3(-0.5f, -0.5f, -0.5f), kat::BLUE, glm::vec3(0.0f, -1.0f, 0.0f)},
+            Vertex{glm::vec3(-0.5f, -0.5f, -0.5f), kat::BLUE, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, -0.5f), kat::GREEN, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec2(1.0f, 0.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(0.5f, -0.5f, 0.5f), kat::MAGENTA, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, -0.5f, 0.5f), kat::YELLOW, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec2(0.0f, 1.0f)},
+            Vertex{glm::vec3(-0.5f, -0.5f, -0.5f), kat::BLUE, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
         };
 
         m_vertex_buffer = m_context->gpu_allocator()->init_buffer(vertices, vk::BufferUsageFlagBits::eVertexBuffer, VMA_MEMORY_USAGE_GPU_ONLY);
@@ -295,7 +309,7 @@ namespace game {
         render_ui();
 
         ImGui::Render();
-        ImDrawData* draw_data = ImGui::GetDrawData();
+        ImDrawData *draw_data = ImGui::GetDrawData();
         ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
 
         m_render_pass->end(cmd);
@@ -316,7 +330,7 @@ namespace game {
     void Game::update_ubo() {
         float aspect = m_window->aspect();
 
-        glm::mat4 view = glm::mat4(m_rot) * glm::translate(glm::identity<glm::mat4>(), m_pos);
+        glm::mat4 view       = glm::mat4(m_rot) * glm::translate(glm::identity<glm::mat4>(), m_pos);
         glm::mat4 projection = glm::perspectiveFov(glm::radians(90.0f), 2.0f, 2.0f * aspect, 0.1f, 100.0f);
 
         glm::mat4 pv_matrix = projection * view;
@@ -327,14 +341,15 @@ namespace game {
     }
 
     void Game::render_ui() {
-        if (m_demowindow_open) ImGui::ShowDemoWindow(&m_demowindow_open);
+        if (m_demowindow_open)
+            ImGui::ShowDemoWindow(&m_demowindow_open);
 
         ImGui::Begin("Stats");
         ImGui::Text("FPS: %f", 1.0f / render_delta());
         ImGui::Text("UPS: %f", 1.0f / update_delta());
-        ImGui::ColorEdit4("Background Color", reinterpret_cast<float*>(&m_background_color), ImGuiColorEditFlags_NoAlpha);
-        ImGui::ColorEdit4("Light Color", reinterpret_cast<float*>(&m_light_color), ImGuiColorEditFlags_NoAlpha);
-        ImGui::ColorEdit4("Ambient Light Color", reinterpret_cast<float*>(&m_ambient_light_color), ImGuiColorEditFlags_NoAlpha);
+        ImGui::ColorEdit4("Background Color", reinterpret_cast<float *>(&m_background_color), ImGuiColorEditFlags_NoAlpha);
+        ImGui::ColorEdit4("Light Color", reinterpret_cast<float *>(&m_light_color), ImGuiColorEditFlags_NoAlpha);
+        ImGui::ColorEdit4("Ambient Light Color", reinterpret_cast<float *>(&m_ambient_light_color), ImGuiColorEditFlags_NoAlpha);
         ImGui::InputFloat3("Light Pos", glm::value_ptr(m_light_pos), "%.2f");
         ImGui::SliderFloat("Ambient Strength", &m_ambient_strength, 0.01f, 1.0f, "%.2f");
         ImGui::SliderFloat("Specular Strength", &m_specular_strength, 0.01f, 1.0f, "%.2f");

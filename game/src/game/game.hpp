@@ -24,6 +24,7 @@ namespace game {
         glm::vec3 position;
         alignas(16) kat::color color;
         glm::vec3 normal;
+        glm::vec2 tex_coords;
     };
 
     struct PushConstants {
@@ -92,6 +93,8 @@ namespace game {
         glm::vec4 m_light_pos = glm::vec4{0.5f, -2.0f, 1.5f, 1.0f};
 
         std::shared_ptr<kat::Image> m_test_image;
+        std::shared_ptr<kat::ImageView> m_test_image_view;
+        std::shared_ptr<kat::Sampler> m_test_sampler;
     };
 
 } // namespace game
