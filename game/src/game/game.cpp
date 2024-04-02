@@ -301,16 +301,19 @@ namespace game {
 
         cmd.drawIndexed(36, 1, 0, 0, 0);
 
-        // Imgui render
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
 
-        render_ui();
+        if (m_ui_toggled) {
+            // Imgui render
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
 
-        ImGui::Render();
-        ImDrawData *draw_data = ImGui::GetDrawData();
-        ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
+            render_ui();
+
+            ImGui::Render();
+            ImDrawData *draw_data = ImGui::GetDrawData();
+            ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
+        }
 
         m_render_pass->end(cmd);
 

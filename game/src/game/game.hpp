@@ -95,6 +95,8 @@ namespace game {
         std::shared_ptr<kat::Image> m_test_image;
         std::shared_ptr<kat::ImageView> m_test_image_view;
         std::shared_ptr<kat::Sampler> m_test_sampler;
+
+        bool m_ui_toggled = false;
     };
 
 } // namespace game

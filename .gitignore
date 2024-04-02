@@ -4,3 +4,4 @@ out/
 *.spv
 imgui.ini
 compile_commands.json
+.cache/

@@ -8,6 +8,8 @@
 
 #include <vulkan/vulkan.hpp>
 
+#include "kat/input_system.hpp"
+
 namespace kat {
     class Context;
 
@@ -38,8 +40,12 @@ namespace kat {
 
         [[nodiscard]] inline float aspect() const { return static_cast<float>(m_size.y) / static_cast<float>(m_size.x); };
 
+        [[nodiscard]] inline const std::unique_ptr<InputSystem>& input_system() const { return m_input_system; };
+
       private:
         GLFWwindow *m_window;
         glm::ivec2  m_size;
+        std::unique_ptr<InputSystem> m_input_system;
+
     };
 } // namespace kat

@@ -15,10 +15,10 @@ add_library(katengine STATIC src/kat/vmaimpl.cpp
         src/kat/graphics/window.hpp)
 
 find_package(imgui CONFIG REQUIRED)
-
+find_package(eventpp CONFIG REQUIRED)
 
 target_include_directories(katengine PUBLIC src/)
-target_link_libraries(katengine PUBLIC glfw Vulkan::Vulkan glm::glm vk-bootstrap::vk-bootstrap GPUOpen::VulkanMemoryAllocator imgui::imgui)
+target_link_libraries(katengine PUBLIC glfw Vulkan::Vulkan glm::glm vk-bootstrap::vk-bootstrap GPUOpen::VulkanMemoryAllocator imgui::imgui eventpp::eventpp)
 target_compile_definitions(katengine PUBLIC -DGLM_FORCE_RADIANS -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_DEFAULT_ALIGNED_GENTYPES -DGLM_ENABLE_EXPERIMENTAL -DGLFW_INCLUDE_VULKAN)
 
 add_library(katengine::katengine ALIAS katengine)

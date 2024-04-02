@@ -5,6 +5,9 @@
   "dependencies" : [ {
     "name" : "imgui",
     "version>=" : "1.90#4",
-    "features": ["docking-experimental", "freetype", "glfw-binding", "vulkan-binding"]
+    "features" : [ "docking-experimental", "freetype", "glfw-binding", "vulkan-binding" ]
+  }, {
+    "name" : "eventpp",
+    "version>=" : "0.1.3"
   } ]
 }
